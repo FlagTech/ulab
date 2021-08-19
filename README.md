@@ -8,7 +8,7 @@
 
 1. MicroPython 請檢出到 b16990425 雜湊碼的提交狀態：
 
-```
+```bash
 git clone https://github.com/micropython/micropython.git
 cd micropyton
 git checkout b16990425
@@ -17,13 +17,26 @@ git checkout b16990425
 2. [esp-idf 工具鏈](https://hackmd.io/ELwKGJYTSq--7MRaOOuGyQ?view#%E6%BA%96%E5%82%99-ESP-IDF-%E5%B7%A5%E5%85%B7%E9%8F%88)請依照上述文章採用 143d26aa49df524e10fb8e41a71d12e731b9b71d 雜湊碼的 3.3 版。
 3. 請依照〈[加入使用者自訂模組–以 ulab 為例](https://hackmd.io/ELwKGJYTSq--7MRaOOuGyQ?view#%E5%8A%A0%E5%85%A5%E4%BD%BF%E7%94%A8%E8%80%85%E8%87%AA%E8%A8%82%E6%A8%A1%E7%B5%84%E2%80%93%E4%BB%A5-ulab-%E7%82%BA%E4%BE%8B)〉修改 ports/esp32/mpconfigport.h 檔, 啟用 ulab 模組。
 4. 請在 ports/esp32/modules/ 下加入此套件所需的各 Python 模組檔案, 這些模組可在 [FM623A 的下載檔案](https://github.com/FlagTech/Python_AIoT_FM623A)中找到：
-  ```
+  ```bash
   ports/esp32/modules/BlynkLib.py
   ports/esp32/modules/keras_lite.py
   ports/esp32/modules/mpu6050.py
   ports/esp32/modules/umqtt/
   ports/esp32/modules/urequests.py  
   ```
+  
+如果要跟新版本的 MicroPython 編譯在一起：
+1. esp-idf 工具要檢出成 4.2 版
+2. 不需要依照上述第 2 點修改 ports/esp32/mpconfigport.h 檔, 但要在 ports/esp32 下建立一個 makefile 檔：
+
+  ```makefile
+  BOARD = GENERIC
+  USER_C_MODULES = $(BUILD_DIR)/ulab/code/micropython.cmake
+
+  include Makefile
+  ```
+1. 建置時只要執行 make 即可。
+
 以下是 [ulab](https://github.com/v923z/micropython-ulab) 原始說明。
 
 # micropython-ulab
