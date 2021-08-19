@@ -94,18 +94,15 @@ void ndarray_print(const mp_print_t *print, mp_obj_t self_in, mp_print_kind_t ki
     if(self->array->len == 0) {
         mp_print_str(print, "[]");
     } else {
-        if((self->m == 1) || (self->n == 1)) {
-            ndarray_print_row(print, self->array, 0, self->array->len);
-        } else {
-            // TODO: add vertical ellipses for the case, when self->m > PRINT_MAX
-            mp_print_str(print, "[");
-            ndarray_print_row(print, self->array, 0, self->n);
-            for(size_t i=1; i < self->m; i++) {
-                mp_print_str(print, ",\n\t ");
-                ndarray_print_row(print, self->array, i*self->n, self->n);
-            }
-            mp_print_str(print, "]");
+        // TODO: add vertical ellipses for the case, when self->m > PRINT_MAX
+        mp_print_str(print, "[");
+        ndarray_print_row(print, self->array, 0, self->n);
+        for(size_t i=1; i < self->m; i++) {
+            mp_print_str(print, ",\n\t ");
+            ndarray_print_row(print, self->array, i*self->n, self->n);
         }
+        mp_print_str(print, "]");
+        
     }
     if(self->array->typecode == NDARRAY_UINT8) {
         mp_print_str(print, ", dtype=uint8)");
@@ -580,7 +577,7 @@ mp_obj_t ndarray_iternext(mp_obj_t self_in) {
     ndarray_obj_t *ndarray = MP_OBJ_TO_PTR(self->ndarray);
     // TODO: in numpy, ndarrays are iterated with respect to the first axis. 
     size_t iter_end = 0;
-    if((ndarray->m == 1)) {
+    if(ndarray->m == 1) {
         iter_end = ndarray->array->len;
     } else {
         iter_end = ndarray->m;
@@ -719,7 +716,7 @@ mp_obj_t ndarray_binary_op(mp_binary_op_t op, mp_obj_t lhs, mp_obj_t rhs) {
         // next, the ndarray stuff
         ndarray_obj_t *ol = MP_OBJ_TO_PTR(lhs);
         ndarray_obj_t *or = MP_OBJ_TO_PTR(RHS);
-        if(!rhs_is_scalar && ((ol->m != or->m) || (ol->n != or->n))) {
+        if(!rhs_is_scalar && ((ol->m != or->m) || (ol->n != or->n)) && ((or->m != 1) && (ol->n != or->n))) {
             mp_raise_ValueError("operands could not be broadcast together");
         }
         // At this point, the operands should have the same shape
@@ -888,12 +885,12 @@ mp_obj_t ndarray_unary_op(mp_unary_op_t op, mp_obj_t self_in) {
                 return ndarray_copy(self_in);
             }
             ndarray = MP_OBJ_TO_PTR(ndarray_copy(self_in));
-            if((self->array->typecode == NDARRAY_INT8)) {
+            if(self->array->typecode == NDARRAY_INT8) {
                 int8_t *array = (int8_t *)ndarray->array->items;
                 for(size_t i=0; i < self->array->len; i++) {
                     if(array[i] < 0) array[i] = -array[i];
                 }
-            } else if((self->array->typecode == NDARRAY_INT16)) {
+            } else if(self->array->typecode == NDARRAY_INT16) {
                 int16_t *array = (int16_t *)ndarray->array->items;
                 for(size_t i=0; i < self->array->len; i++) {
                     if(array[i] < 0) array[i] = -array[i];

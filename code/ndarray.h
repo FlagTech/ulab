@@ -86,7 +86,12 @@ mp_obj_t ndarray_asbytearray(mp_obj_t );
     if(((op) == MP_BINARY_OP_ADD) || ((op) == MP_BINARY_OP_SUBTRACT) || ((op) == MP_BINARY_OP_MULTIPLY)) {\
         ndarray_obj_t *out = create_new_ndarray(ol->m, ol->n, typecode);\
         type_out *(odata) = (type_out *)out->array->items;\
-        if((op) == MP_BINARY_OP_ADD) { for(size_t i=0, j=0; i < (ol)->array->len; i++, j+=inc) odata[i] = left[i] + right[j];}\
+        if((op) == MP_BINARY_OP_ADD) {\
+            for(size_t i=0, j=0; i < (ol)->array->len; i++, j+=inc) {\
+                odata[i] = left[i] + right[j];\
+                if(or->m==1 && j==(or->n-1)){j = -1;}\
+            }\
+        }\
         if((op) == MP_BINARY_OP_SUBTRACT) { for(size_t i=0, j=0; i < (ol)->array->len; i++, j+=inc) odata[i] = left[i] - right[j];}\
         if((op) == MP_BINARY_OP_MULTIPLY) { for(size_t i=0, j=0; i < (ol)->array->len; i++, j+=inc) odata[i] = left[i] * right[j];}\
         return MP_OBJ_FROM_PTR(out);\

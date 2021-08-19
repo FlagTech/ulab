@@ -24,7 +24,7 @@
 #include "fft.h"
 #include "numerical.h"
 
-STATIC MP_DEFINE_STR_OBJ(ulab_version_obj, "0.26.7");
+STATIC MP_DEFINE_STR_OBJ(ulab_version_obj, "0.26.8f");
 
 MP_DEFINE_CONST_FUN_OBJ_1(ndarray_shape_obj, ndarray_shape);
 MP_DEFINE_CONST_FUN_OBJ_1(ndarray_rawsize_obj, ndarray_rawsize);
@@ -41,6 +41,12 @@ MP_DEFINE_CONST_FUN_OBJ_KW(linalg_ones_obj, 0, linalg_ones);
 MP_DEFINE_CONST_FUN_OBJ_KW(linalg_eye_obj, 0, linalg_eye);
 MP_DEFINE_CONST_FUN_OBJ_1(linalg_det_obj, linalg_det);
 MP_DEFINE_CONST_FUN_OBJ_1(linalg_eig_obj, linalg_eig);
+MP_DEFINE_CONST_FUN_OBJ_KW(linalg_activation_obj, 1, linalg_activation);
+MP_DEFINE_CONST_FUN_OBJ_KW(linalg_conv1D_obj, 3, linalg_conv1D);
+MP_DEFINE_CONST_FUN_OBJ_KW(linalg_maxPooling1D_obj, 1, linalg_maxPooling1D);
+MP_DEFINE_CONST_FUN_OBJ_KW(linalg_averagePooling1D_obj, 1, linalg_averagePooling1D);
+MP_DEFINE_CONST_FUN_OBJ_1(linalg_globalMaxPooling1D_obj, linalg_globalMaxPooling1D);
+MP_DEFINE_CONST_FUN_OBJ_1(linalg_globalAveragePooling1D_obj, linalg_globalAveragePooling1D);
 
 MP_DEFINE_CONST_FUN_OBJ_1(vectorise_acos_obj, vectorise_acos);
 MP_DEFINE_CONST_FUN_OBJ_1(vectorise_acosh_obj, vectorise_acosh);
@@ -123,7 +129,13 @@ STATIC const mp_map_elem_t ulab_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_ones), (mp_obj_t)&linalg_ones_obj },
     { MP_ROM_QSTR(MP_QSTR_eye), (mp_obj_t)&linalg_eye_obj },
     { MP_ROM_QSTR(MP_QSTR_det), (mp_obj_t)&linalg_det_obj },
-    { MP_ROM_QSTR(MP_QSTR_eig), (mp_obj_t)&linalg_eig_obj },    
+    { MP_ROM_QSTR(MP_QSTR_eig), (mp_obj_t)&linalg_eig_obj }, 
+    { MP_ROM_QSTR(MP_QSTR_activation), (mp_obj_t)&linalg_activation_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_conv1D), (mp_obj_t)&linalg_conv1D_obj }, 
+    { MP_OBJ_NEW_QSTR(MP_QSTR_maxPooling1D), (mp_obj_t)&linalg_maxPooling1D_obj }, 
+    { MP_OBJ_NEW_QSTR(MP_QSTR_averagePooling1D), (mp_obj_t)&linalg_averagePooling1D_obj }, 
+    { MP_OBJ_NEW_QSTR(MP_QSTR_globalMaxPooling1D), (mp_obj_t)&linalg_globalMaxPooling1D_obj },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_globalAveragePooling1D), (mp_obj_t)&linalg_globalAveragePooling1D_obj },   
     { MP_OBJ_NEW_QSTR(MP_QSTR_acos), (mp_obj_t)&vectorise_acos_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_acosh), (mp_obj_t)&vectorise_acosh_obj },
     { MP_OBJ_NEW_QSTR(MP_QSTR_asin), (mp_obj_t)&vectorise_asin_obj },

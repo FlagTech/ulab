@@ -12,6 +12,7 @@
 #include <string.h>
 #include <math.h>
 #include "py/obj.h"
+#include "py/objstr.h"
 #include "py/runtime.h"
 #include "py/misc.h"
 #include "linalg.h"
@@ -203,7 +204,7 @@ mp_obj_t linalg_dot(mp_obj_t _m1, mp_obj_t _m2) {
                 v2 = ndarray_get_float_value(m2->array->items, m2->array->typecode, k*m2->n+j);
                 sum += v1 * v2;
             }
-            outdata[j*m1->m+i] = sum;
+            outdata[i*m2->n+j] = sum;
         }
     }
     return MP_OBJ_FROM_PTR(out);
@@ -454,4 +455,283 @@ mp_obj_t linalg_eig(mp_obj_t oin) {
     tuple->items[1] = MP_OBJ_FROM_PTR(eigenvectors);
     return tuple;
     return MP_OBJ_FROM_PTR(eigenvalues);
+}
+
+mp_obj_t linalg_activation(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+        { MP_QSTR_f, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+    };
+
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(1, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    if(!mp_obj_is_type(args[0].u_obj, &ulab_ndarray_type)) {
+        mp_raise_TypeError("activation is defined for ndarrays only");
+    } else {
+        if(mp_obj_is_str(args[1].u_obj)) {
+            size_t f_len;
+            const char *f= mp_obj_str_get_data(args[1].u_obj, &f_len);
+
+            ndarray_obj_t *out = MP_OBJ_TO_PTR(args[0].u_obj);
+            mp_float_t *outdata = (mp_float_t *)out->array->items;
+    
+            if(strcmp(f, "linear")==0){
+                return MP_OBJ_FROM_PTR(out);
+            } else if(strcmp(f, "relu")==0){
+                for(size_t i=0; i < out->m; i++) { // rows of outdata
+                    for(size_t j=0; j < out->n; j++) { // columns of outdata
+                        if(outdata[i*out->n+j]<0){outdata[i*out->n+j] = 0;}
+                    }
+                }
+                return MP_OBJ_FROM_PTR(out);
+            } else if(strcmp(f, "sigmoid")==0){
+                for(size_t i=0; i < out->m; i++) { // rows of outdata
+                    for(size_t j=0; j < out->n; j++) { // columns of outdata
+                        outdata[i*out->n+j] = 1/(1+exp(-1*outdata[i*out->n+j]));
+                    }
+                }
+                return MP_OBJ_FROM_PTR(out);
+            } else if(strcmp(f, "softmax")==0){
+                for(size_t i=0; i < out->m; i++) { // rows of outdata
+                    mp_float_t sum = 0;
+                    for(size_t j=0; j < out->n; j++) { // columns of outdata
+                        outdata[i*out->n+j] = exp(outdata[i*out->n+j]);
+                        sum+=outdata[i*out->n+j];
+                    }
+                    for(size_t j=0; j < out->n; j++) { // columns of outdata
+                        outdata[i*out->n+j] = outdata[i*out->n+j]/sum;
+                    }
+                }
+                return MP_OBJ_FROM_PTR(out);
+            } else{
+                mp_raise_ValueError("unknown activation function");
+            }          
+        } else {
+            mp_raise_ValueError("activation function should be string");
+        }
+    }
+}
+
+mp_obj_t linalg_conv1D(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+        { MP_QSTR_, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+        { MP_QSTR_, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+        { MP_QSTR_kernel_size, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 3} },
+        { MP_QSTR_strides, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 1} },
+        { MP_QSTR_padding, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+    };
+
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(3, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    if(!mp_obj_is_type(args[0].u_obj, &ulab_ndarray_type) || !mp_obj_is_type(args[1].u_obj, &ulab_ndarray_type)) {
+        mp_raise_TypeError("First two arguments should be ndarrays");
+    }
+
+    ndarray_obj_t *x = MP_OBJ_TO_PTR(args[0].u_obj);
+    ndarray_obj_t *w = MP_OBJ_TO_PTR(args[1].u_obj);
+    ndarray_obj_t *b;
+    bool use_bias;
+
+    if(mp_obj_is_type(args[2].u_obj, &ulab_ndarray_type)) {
+        b = MP_OBJ_TO_PTR(args[2].u_obj);
+        use_bias = true;
+    } else{
+        use_bias = false;
+    }
+
+    size_t kernel_size = args[3].u_int;
+    size_t strides = args[4].u_int;
+
+    if(mp_obj_is_str(args[5].u_obj)) {
+        size_t len;
+        const char *pad= mp_obj_str_get_data(args[5].u_obj, &len);
+   
+        if(strcmp(pad, "valid")==0){
+            
+        } else if(strcmp(pad, "same")==0){
+            x = padding(x, kernel_size);
+        } else{
+            mp_raise_ValueError("invalid input of padding");
+        }    
+        
+    } else {
+        mp_raise_ValueError("padding should be string");
+    }
+
+    size_t channels = x->n;
+    size_t filters = w->n;
+    size_t length = x->m;
+    size_t new_length = ceil((float)(length-kernel_size+1)/strides);
+
+    ndarray_obj_t *out = create_new_ndarray(new_length, filters, NDARRAY_FLOAT);
+    mp_float_t *outdata = (mp_float_t *)out->array->items;
+    mp_float_t sum;
+
+    for(size_t k=0; k < filters; k++) {
+        for(size_t step=0; step < new_length; step++) {
+            sum = 0.0;
+            for(size_t i=0; i < kernel_size; i++) {
+                for(size_t j=0; j < channels; j++) {
+                    mp_float_t v1 = ndarray_get_float_value(x->array->items, x->array->typecode, (i+strides*step)*x->n+j);
+                    mp_float_t v2 = ndarray_get_float_value(w->array->items, w->array->typecode, i*(w->m/kernel_size)*w->n+j*w->n+k);
+                    sum += v1 * v2;
+                }
+            }
+            if(use_bias){
+                mp_float_t v3 = ndarray_get_float_value(b->array->items, b->array->typecode, k);
+                sum += v3;
+            }
+            outdata[step*filters+k] = sum;
+        }
+    }
+    return MP_OBJ_FROM_PTR(out); 
+}
+
+ndarray_obj_t *padding(ndarray_obj_t *in, size_t kernel_size) {
+    
+    size_t length = in->m;
+    size_t channels = in->n;
+    size_t add_num = (kernel_size-1)/2;
+    size_t new_length = length+add_num*2+(1-kernel_size%2);
+    ndarray_obj_t *out = create_new_ndarray(new_length, channels, NDARRAY_FLOAT);
+    mp_float_t *outdata = (mp_float_t *)out->array->items;
+    mp_float_t *indata = (mp_float_t *)in->array->items;
+
+    for(size_t i=0; i < new_length*channels; i++) {
+        if(i<add_num*channels){
+            outdata[i] = 0;
+        }
+        else if(i<(add_num+length)*channels){
+            outdata[i] = indata[i-add_num*channels];
+        }
+        else{
+            outdata[i] = 0;
+        }
+    }
+    return out;
+}
+
+mp_obj_t linalg_maxPooling1D(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+        { MP_QSTR_pool_size, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 2} },
+        { MP_QSTR_strides, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0} },
+    };
+
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(1, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    if(!mp_obj_is_type(args[0].u_obj, &ulab_ndarray_type)) {
+        mp_raise_TypeError("maxpooling is defined for ndarrays only");
+    }
+
+    ndarray_obj_t *x = MP_OBJ_TO_PTR(args[0].u_obj);
+    size_t pool_size = args[1].u_int;
+    size_t strides = args[2].u_int;
+    if(strides==0){strides = pool_size;}
+
+    size_t length = x->m;
+    size_t channels = x->n;
+    size_t new_length = ceil((float)(length-pool_size+1)/strides);
+
+    ndarray_obj_t *out = create_new_ndarray(new_length, channels, NDARRAY_FLOAT);
+    mp_float_t *outdata = (mp_float_t *)out->array->items;
+
+    for(size_t i=0; i < new_length; i++) {
+        for(size_t j=0; j < channels; j++) {
+            mp_float_t max = 0.0;
+            for(size_t k=0; k < pool_size; k++) {
+                mp_float_t v = ndarray_get_float_value(x->array->items, x->array->typecode, (k+i*strides)*x->n+j);
+                if(v>max){max=v;}
+            }
+            outdata[i*channels+j] = max;
+        }
+    }
+    return out;
+}
+
+mp_obj_t linalg_averagePooling1D(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE } },
+        { MP_QSTR_pool_size, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 2} },
+        { MP_QSTR_strides, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = 0} },
+    };
+
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(1, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    if(!mp_obj_is_type(args[0].u_obj, &ulab_ndarray_type)) {
+        mp_raise_TypeError("maxPooling is defined for ndarrays only");
+    }
+
+    ndarray_obj_t *x = MP_OBJ_TO_PTR(args[0].u_obj);
+    size_t pool_size = args[1].u_int;
+    size_t strides = args[2].u_int;
+    if(strides==0){strides = pool_size;}
+
+    size_t length = x->m;
+    size_t channels = x->n;
+    size_t new_length = ceil((float)(length-pool_size+1)/strides);
+
+    ndarray_obj_t *out = create_new_ndarray(new_length, channels, NDARRAY_FLOAT);
+    mp_float_t *outdata = (mp_float_t *)out->array->items;
+
+    for(size_t i=0; i < new_length; i++) {
+        for(size_t j=0; j < channels; j++) {
+            mp_float_t sum = 0.0;
+            for(size_t k=0; k < pool_size; k++) {
+                mp_float_t v = ndarray_get_float_value(x->array->items, x->array->typecode, (k+i*strides)*x->n+j);
+                sum+=v;
+            }
+            outdata[i*channels+j] = sum/pool_size;
+        }
+    }
+    return out;
+}
+
+mp_obj_t linalg_globalMaxPooling1D(mp_obj_t in) {
+    if(!mp_obj_is_type(in, &ulab_ndarray_type)) {
+        mp_raise_TypeError("globalMaxPooling is defined for ndarrays only");
+    }
+    ndarray_obj_t *x = MP_OBJ_TO_PTR(in);
+    size_t length = x->m;
+    size_t channels = x->n;
+
+    ndarray_obj_t *out = create_new_ndarray(1, channels, NDARRAY_FLOAT);
+    mp_float_t *outdata = (mp_float_t *)out->array->items;
+
+    for(size_t i=0; i < channels; i++) {
+        mp_float_t max = 0.0;
+        for(size_t j=0; j < length; j++) {
+            mp_float_t v = ndarray_get_float_value(x->array->items, x->array->typecode, j*x->n+i);
+            if(v>max){max=v;}
+        }
+        outdata[i] = max;
+    }
+    return out;
+}
+
+mp_obj_t linalg_globalAveragePooling1D(mp_obj_t in) {
+    if(!mp_obj_is_type(in, &ulab_ndarray_type)) {
+        mp_raise_TypeError("globalMaxPooling is defined for ndarrays only");
+    }
+    ndarray_obj_t *x = MP_OBJ_TO_PTR(in);
+    size_t length = x->m;
+    size_t channels = x->n;
+
+    ndarray_obj_t *out = create_new_ndarray(1, channels, NDARRAY_FLOAT);
+    mp_float_t *outdata = (mp_float_t *)out->array->items;
+
+    for(size_t i=0; i < channels; i++) {
+        mp_float_t sum = 0.0;
+        for(size_t j=0; j < length; j++) {
+            mp_float_t v = ndarray_get_float_value(x->array->items, x->array->typecode, j*x->n+i);
+            sum+=v;
+        }
+        outdata[i] = sum/length;
+    }
+    return out;
 }

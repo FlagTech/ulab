@@ -35,5 +35,12 @@ mp_obj_t linalg_eye(size_t , const mp_obj_t *, mp_map_t *);
 
 mp_obj_t linalg_det(mp_obj_t );
 mp_obj_t linalg_eig(mp_obj_t );
+mp_obj_t linalg_activation(size_t, const mp_obj_t *, mp_map_t *);
+mp_obj_t linalg_conv1D(size_t, const mp_obj_t *, mp_map_t *);
+ndarray_obj_t *padding(ndarray_obj_t *, size_t );
+mp_obj_t linalg_maxPooling1D(size_t, const mp_obj_t *, mp_map_t *);
+mp_obj_t linalg_averagePooling1D(size_t, const mp_obj_t *, mp_map_t *);
+mp_obj_t linalg_globalMaxPooling1D(mp_obj_t);
+mp_obj_t linalg_globalAveragePooling1D(mp_obj_t);
 
 #endif
