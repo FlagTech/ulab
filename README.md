@@ -27,11 +27,11 @@ git checkout b16990425
   
 如果要跟新版本的 MicroPython 編譯在一起：
 1. esp-idf 工具要檢出成 4.2 版
-2. 不需要依照上述第 2 點修改 ports/esp32/mpconfigport.h 檔, 但要在 ports/esp32 下建立一個 makefile 檔：
+2. 不需要依照上述第 2 點修改 ports/esp32/mpconfigport.h 檔, 但要在 ports/esp32 下建立一個 makefile 檔 (以下假設你的 ulab 是在使用者家資料夾下的 code 中)：
 
   ```makefile
   BOARD = GENERIC
-  USER_C_MODULES = $(BUILD_DIR)/ulab/code/micropython.cmake
+  USER_C_MODULES = $(HOME)/code/ulab/code/micropython.cmake
 
   include Makefile
   ```
